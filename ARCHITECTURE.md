@@ -25,28 +25,28 @@
 
 ## Classes
 
-```ts
-type Master = {
+```java
+class Master = {
     db: DbClient;
-    events: Events[]
+    events: Events[];
 
-    createEvent(),
-    changeEvent(),
-    deleteEvent(),
+    createEvent();
+    changeEvent();
+    deleteEvent();
 
-    createRequest(),
+    createRequest();
     ...,
 }
 
 
-type User = {
+class User = {
     id: string;
     name: string;
     role: Role;
     allergies: string[];
 };
 
-type Event = {
+class Event = {
     id: string;
     poster: User;
     name: string;
@@ -56,11 +56,32 @@ type Event = {
     queue: Request[];
 };
 
-type Request = {
-    user: User,
-    event: Event,
-    info: Info,
+class Request = {
+    user: User;
+    event: Event;
+    info: Info;
 }
+
+class NotificationSystem = {
+    observers: NotificationObserver[];
+
+    subscribe(observer: NotificationObserver);
+    update(message: string) {
+        for (NotificationObserver observer : observers) {
+            observer.update(message);
+        }
+    }
+}
+
+class NotificationObserver = {
+    update(message: string);
+}
+
+class EmailNotifier extends NotificationObserver = {
+    update(message: string);
+}
+
+
 ```
 
 ## API
