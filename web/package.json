@@ -8,6 +8,7 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"scripts": {
+		"start": "node build",
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
