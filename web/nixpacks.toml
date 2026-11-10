@@ -1,0 +1,7 @@
+# Nixpacks' bundled corepack (0.24.1) can't fetch pnpm 12, so install pnpm directly
+# and skip the default pnpm-9_x nix package.
+[phases.setup]
+nixPkgs = ["nodejs_24"]
+
+[phases.install]
+cmds = ["npm install -g pnpm@12.18.0", "pnpm install --frozen-lockfile"]
