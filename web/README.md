@@ -1,56 +1,25 @@
-# sv
+# IT event — frontend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit 3.1, Svelte 5, TypeScript 6 och Vite 8. Använd Node 24 och pnpm 12.18.0.
 
-## Creating a project
+Fullständiga instruktioner för **Linux, Windows och macOS**, samt valfri serverstart, finns i [projektets README](../README.md).
 
-If you're seeing this, you've probably already done this step. Congrats!
+Kör i den här mappen:
 
-```sh
-# create a new project
-npx sv create my-app
+```bash
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-To recreate this project with the same configuration:
+Öppna http://localhost:5173. På Windows kan du använda `pnpm.cmd`; om pnpm inte är globalt installerat kan du använda `corepack pnpm`.
 
-```sh
-# recreate this project
-pnpm dlx sv@1.3.0 create --template minimal --types ts --install pnpm web
+```bash
+pnpm check
+pnpm build
 ```
 
-## Adding features
+Formatering: `pnpm format`. Kontrollera formatering: `pnpm format:check`.
 
-Add features to your project with `sv add`:
+Flöde: `/` → `/events/[slug]` → `/events/[slug]/anmalan`.
 
-```sh
-npx sv add
-```
-
-For example, to add Tailwind CSS:
-
-```sh
-npx sv add tailwindcss
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Detta är en prototyp med exempeldata och validerad testanmälan. Inget sparas och frontend är ännu inte kopplat till Java-servern. `adapter-auto` behålls tills deploymål är bestämt. Inga tester är tillagda.
