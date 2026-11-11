@@ -1,9 +1,33 @@
 # Architecture
 
-## Frameworks
+## Overview
 
-- Spring Boot for Java server
-- SvelteKit for web
+Monorepo with two separately built apps:
+
+```
+server/   Spring Boot REST backend (Java 17, Maven)
+web/      SvelteKit frontend (TypeScript, pnpm)
+```
+
+The web app talks to the server over HTTP. The server owns all domain logic and persistence.
+
+## Stack
+
+### Server (`server/`)
+
+- Spring Boot 4.1 (Java 17), package `it.chalmers.commit`
+- Spring Web MVC for the HTTP layer, Spring Security for auth, Bean Validation for input checks
+- Spring Data JPA with PostgreSQL (H2 for tests)
+- Actuator for health/metrics
+- Database connection is configured via `DB_URL`, `DB_USER`, `DB_PASSWORD` (defaults to a local `oop` database)
+
+### Web (`web/`)
+
+- SvelteKit 3 with Svelte 5, built with Vite and served by `adapter-node` (`pnpm build`, then `pnpm start`)
+- Tailwind CSS v4 for styling
+- shadcn-svelte (style `nova`, neutral base, lucide icons) for UI components, primary color `#09CDDA`
+- Import aliases: `#lib` -> `src/lib`, components in `#lib/components`, UI primitives in `#lib/components/ui`
+- Geist as the font
 
 ## Requirements
 
