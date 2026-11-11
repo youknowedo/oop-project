@@ -1,0 +1,92 @@
+name: Architecture approvals
+
+# Pull requests that change the architecture document or the model package
+# need approval from three team members. Other pull requests pass this check.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: architecture-approvals-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  approvals:
+    name: Three approvals on architecture and model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          REQUIRED_APPROVALS: "3"
+          # Team members whose approval counts.
+          TEAM: "youknowedo,SimonSuslich,jungwonenjoyericl,alaahefni09"
+          # A file is protected if its path equals one of these or starts with
+          # one that ends in a slash.
+          PROTECTED_PATHS: |
+            ARCHITECTURE.md
+            server/src/main/java/it/chalmers/commit/model/
+        with:
+          script: |
+            const required = Number(process.env.REQUIRED_APPROVALS);
+            const team = process.env.TEAM.split(",").map((s) => s.trim().toLowerCase());
+            const protectedPaths = process.env.PROTECTED_PATHS.split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+
+            const isProtected = (path) =>
+              protectedPaths.some((p) => (p.endsWith("/") ? path.startsWith(p) : path === p));
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const touched = files
+              .flatMap((f) => [f.filename, f.previous_filename])
+              .filter((path) => path && isProtected(path));
+
+            if (touched.length === 0) {
+              core.info("No protected files changed. Nothing to check.");
+              return;
+            }
+            core.info(`Protected files changed:\n${[...new Set(touched)].join("\n")}`);
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner,
+              repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            // Keep each reviewer's latest verdict. Plain comments do not change it.
+            const verdicts = new Map();
+            for (const review of reviews) {
+              if (!review.user) continue;
+              if (!["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(review.state)) continue;
+              verdicts.set(review.user.login.toLowerCase(), review.state);
+            }
+
+            const author = pr.user.login.toLowerCase();
+            const approvers = [...verdicts]
+              .filter(([login, state]) => state === "APPROVED" && login !== author && team.includes(login))
+              .map(([login]) => login);
+
+            core.info(`Approvals from team members: ${approvers.join(", ") || "none"}`);
+
+            if (approvers.length < required) {
+              core.setFailed(
+                `This pull request changes the architecture document or the model. ` +
+                  `It needs ${required} approvals from team members and has ${approvers.length}.`
+              );
+            }
