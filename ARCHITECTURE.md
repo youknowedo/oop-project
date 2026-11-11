@@ -316,6 +316,28 @@ classDiagram
 - Reminders (e.g. "30 minutes before sign-up opens") are time-based. A scheduler outside the model checks what is due and calls the notification system, so the model stays testable without real time passing.
 - TODO(team): decide who gets a reminder, everyone or only users who opted in.
 
+## Persistence and schema
+
+> Proposed. Nothing here is implemented yet.
+
+There are two things to keep in sync: the database schema with the JPA entities, and the JPA entities with the model classes.
+
+### Database schema and JPA entities
+
+- **Flyway migrations are the source of truth for the schema.** SQL files in `server/src/main/resources/db/migration/`, one per schema change.
+- **Hibernate only validates.** Set `spring.jpa.hibernate.ddl-auto=validate`. The server then refuses to start if an entity and the schema disagree, instead of drifting silently.
+- **`update` is not safe.** It never drops or renames columns, so each teammate's local database and the Dokploy database slowly diverge from the entities. It is only acceptable during the first days, before the entities settle.
+- **Entity change and migration go in the same PR.** A change to a JPA entity without a migration is incomplete.
+- **Tests run the same migrations.** Tests on H2 apply the Flyway migrations rather than letting Hibernate create the tables.
+
+### Model classes and JPA entities
+
+- **Separate classes.** `persistence` has its own JPA entities, written by hand, and a mapper per aggregate that converts to and from the model classes. The model never sees an entity.
+- **Aggregate = `Event` with its `Registration`s.** The aggregate is loaded and saved as a whole through the repository, so `Event` can enforce its rules over all its registrations.
+- **Repositories.** The implementations live in `persistence` and implement the interfaces the model defines (`EventRepository`, `UserRepository`).
+- **Cross-event history needs its own interface.** The `WeightCalculator` in the weighted queue needs a user's past registrations across all events, which is not part of any `Event` aggregate. The model defines a separate interface for it (for example `RegistrationHistory`) and `persistence` implements it.
+- **Rejected: annotating the model classes directly with JPA.** It is less code, but it breaks the rule that `model` imports nothing from Spring or JPA, and ties the model's shape to the table layout.
+
 ## API
 
 > Draft. Paths, methods and rules are a starting point for the team to agree on. All endpoints are under `/api` and require login unless noted.
