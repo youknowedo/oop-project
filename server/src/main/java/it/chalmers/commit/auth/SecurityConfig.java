@@ -12,6 +12,8 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 @Configuration
 class SecurityConfig {
 
+  // @Bean: Spring calls this method once at startup and keeps the returned filter chain as a
+  // managed object. Spring Security picks it up and applies it to every incoming request.
   @Bean
   SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.authorizeHttpRequests(
