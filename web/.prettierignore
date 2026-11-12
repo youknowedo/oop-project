@@ -1,0 +1,9 @@
+# Package manager files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Generated
+/.svelte-kit
+/build
+/static
