@@ -1,6 +1,6 @@
 package it.chalmers.commit.model;
 
-public class Request {
+public class Signup{
     private User user;
     private Event event;
     private Info info;
