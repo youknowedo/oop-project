@@ -49,7 +49,7 @@ Consequences:
 
 ## Authentication (Gamma)
 
-> Proposed, not implemented yet. Gamma's user fields and group data are still to be verified.
+> Decided: Spring Security owns the login flow (see below). Not implemented yet. Gamma's user fields and group data are still to be verified.
 
 Login uses Gamma (the IT section's account system) over OAuth 2.0 authorization code flow.
 
@@ -78,7 +78,7 @@ Requirements: Java 17, Node 24 (see `web/.nvmrc`), pnpm, PostgreSQL.
 - Production web build: `cd web && pnpm build && pnpm start` (runs `node build`).
 - Production server build: `cd server && ./mvnw package`, then run the jar with the DB variables set.
 - Hosted on a Dokploy instance.
-- TODO(team): decide whether to add CI.
+- CI (GitHub Actions) runs on every PR. Server: `./mvnw verify` (compile, tests including the architecture rules, Spotless formatting). Web: Prettier check, `svelte-check` and build.
 
 ## Requirements
 
@@ -243,7 +243,7 @@ stateDiagram-v2
     FINISHED --> [*]
 ```
 
-Editing a published event does not change its status. A draft can be deleted.
+Editing a published event does not change its status. Only a draft can be deleted. A published event is cancelled instead, and `DELETE /events/{id}` on a non-draft event is rejected.
 
 - Sign-up is only possible while the event is `PUBLISHED` and the current time is after `signUpOpens`. "Open" is not a status of its own, it is derived from the time.
 - Cancelling an event cancels all its registrations and notifies the users.
@@ -264,15 +264,20 @@ classDiagram
     class WeightCalculator {
         weightOf(user) int
     }
+    class RegistrationHistory {
+        <<interface>>
+        pastRegistrationsOf(user) List~Registration~
+    }
     AllocationStrategy <|.. FirstComeFirstServed
     AllocationStrategy <|.. Weighted
     Weighted --> WeightCalculator
+    WeightCalculator --> RegistrationHistory
 ```
 
 - **FirstComeFirstServed:** promotes the `QUEUED` registration with the earliest `createdAt`.
 - **Weighted (optional):** a weighted queue. People still join in sign-up order, but each user's weight bumps them down the queue, so reliable users move ahead of unreliable ones who signed up earlier. The next person promoted is the one at the top of the weighted queue.
 
-**Weight.** It works like a grid penalty in motorsport: a user's weight is a number of places they drop from where they would otherwise start, based on past behaviour. The `WeightCalculator` computes it:
+**Weight.** It works like a grid penalty in motorsport: a user's weight is a number of places they drop from where they would otherwise start, based on past behaviour. The `WeightCalculator` computes it from the user's past registrations across all events, which it gets through the model-defined `RegistrationHistory` interface (implemented in `persistence`, see [Persistence and schema](#persistence-and-schema)):
 
 ```
 weight = min(maxWeight, noShowWeight * noShows + lateCancelWeight * lateCancels)
@@ -303,7 +308,7 @@ The model publishes a message when something happens (sign-up confirmed, promote
 classDiagram
     class NotificationSystem {
         subscribe(observer)
-        update(message)
+        publish(message)
     }
     class NotificationObserver {
         <<interface>>
@@ -348,7 +353,7 @@ There are two things to keep in sync: the database schema with the JPA entities,
 | POST | `/events` | Create an event | Organizer |
 | GET | `/events/{id}` | Event details | Any user |
 | PUT | `/events/{id}` | Update an event | Event's organizer |
-| DELETE | `/events/{id}` | Delete an event | Event's organizer |
+| DELETE | `/events/{id}` | Delete a draft event (others are cancelled) | Event's organizer |
 | POST | `/events/{id}/signups` | Sign up for an event. Joins the queue if the event is full | Any user |
 | DELETE | `/events/{id}/signups/me` | Cancel own sign-up. Next in queue is promoted | Signed-up user |
 | GET | `/events/{id}/signups` | See attendees and queue | Event's organizer |
