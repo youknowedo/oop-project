@@ -110,6 +110,24 @@ class EmailNotifier extends NotificationObserver = {
 
 ## API
 
+### Base path and versioning
+
+All REST endpoints live under `/api/v1`. The version is part of the path and added centrally (`ApiConfig`), so controllers declare paths without the prefix, e.g. `@GetMapping("/events/{id}")` is served at `/api/v1/events/{id}`. Actuator stays at `/actuator`.
+
+### Errors
+
+Every error response has the same JSON body, `ApiError`:
+
+```json
+{
+  "code": "VALIDATION_FAILED",
+  "message": "Request validation failed",
+  "fieldErrors": [{ "field": "name", "message": "must not be blank" }]
+}
 ```
-/event/[id]
-```
+
+- `code` is stable and meant for clients to branch on. It is the HTTP status name (`NOT_FOUND`, `FORBIDDEN`, `INTERNAL_SERVER_ERROR`, ...), or `VALIDATION_FAILED` for validation errors.
+- `message` is for humans.
+- `fieldErrors` is only present for validation errors (HTTP 400), one entry per invalid field or parameter.
+
+A global `@RestControllerAdvice` (`ApiExceptionHandler`) produces these bodies. Controllers throw exceptions (e.g. `ResponseStatusException`) instead of building error responses. Unexpected exceptions are returned as a generic 500 and only logged.
