@@ -1,5 +1,7 @@
 package it.chalmers.commit.api.error;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -11,9 +13,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponse;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -44,6 +50,34 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
     }
 
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        List<ApiError.FieldError> fieldErrors = new ArrayList<>();
+        ex.getBindingResult().getGlobalErrors().forEach(e -> fieldErrors.add(
+                new ApiError.FieldError(e.getObjectName(), e.getDefaultMessage())));
+        ex.getBindingResult().getFieldErrors().forEach(e -> fieldErrors.add(
+                new ApiError.FieldError(e.getField(), e.getDefaultMessage())));
+        return validationFailed(headers, fieldErrors);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(
+            HandlerMethodValidationException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        List<ApiError.FieldError> fieldErrors = new ArrayList<>();
+        for (ParameterValidationResult result : ex.getParameterValidationResults()) {
+            if (result instanceof ParameterErrors errors) {
+                errors.getFieldErrors().forEach(e -> fieldErrors.add(
+                        new ApiError.FieldError(e.getField(), e.getDefaultMessage())));
+            } else {
+                String name = result.getMethodParameter().getParameterName();
+                result.getResolvableErrors().forEach(e -> fieldErrors.add(
+                        new ApiError.FieldError(name, e.getDefaultMessage())));
+            }
+        }
+        return validationFailed(headers, fieldErrors);
+    }
+
     /** Called by the base class for every Spring MVC exception it handles. */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
@@ -56,6 +90,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 ? problem.getDetail()
                 : defaultMessage(statusCode);
         return ResponseEntity.status(statusCode).headers(headers).body(ApiError.of(codeFor(statusCode), message));
+    }
+
+    private static ResponseEntity<Object> validationFailed(HttpHeaders headers, List<ApiError.FieldError> fieldErrors) {
+        ApiError body = new ApiError("VALIDATION_FAILED", "Request validation failed", fieldErrors);
+        return ResponseEntity.badRequest().headers(headers).body(body);
     }
 
     private static ResponseEntity<Object> respond(HttpStatus status, String message) {
