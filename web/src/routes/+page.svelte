@@ -1,2 +1,6 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<svelte:head>
+	<title>Commit</title>
+</svelte:head>
+
+<h1 class="text-2xl font-semibold tracking-tight">Events</h1>
+<p class="mt-2 text-muted-foreground">Upcoming events will show up here.</p>
