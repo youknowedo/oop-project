@@ -337,6 +337,8 @@ There is one thing to keep in sync: the database schema with the entity classes 
 ### Database schema and JPA entities
 
 - **Flyway migrations are the source of truth for the schema.** SQL files in `server/src/main/resources/db/migration/`, one per schema change.
+- **Naming: `NNN__description.sql`**, for example `001__create_tables.sql` and `002__add_event_location.sql`. Numbers are zero-padded and count up. Never edit a migration that has been merged, add a new one instead.
+- **Drafting a migration:** change the entity, start the local database, then run `cd server && ./new-migration add_event_location`. It applies the existing migrations to the local database, asks Hibernate what SQL is missing to match the entities, and saves that as the next numbered file. Read the file before committing it: Hibernate treats a renamed column as a drop plus an add. Run it against your own local database, not the shared one.
 - **Hibernate only validates.** Set `hibernate.hbm2ddl.auto=validate`. The server then refuses to start if an entity and the schema disagree, instead of drifting silently.
 - **`update` is not safe.** It never drops or renames columns, so each teammate's local database and the Dokploy database slowly diverge from the entities. It is only acceptable during the first days, before the entities settle.
 - **Entity change and migration go in the same PR.** A change to a JPA entity without a migration is incomplete.
