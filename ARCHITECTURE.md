@@ -26,7 +26,7 @@ The web app talks to the server over HTTP. The server owns all domain logic and 
 
 - `model`: the domain objects and all database access. A `Database` class owns the Hibernate `SessionFactory`, and collection-style classes (for example an `Events` class) use it, so nothing outside the model sees a Hibernate session. The model may use any library but must not depend on `view` or `controller`
 - `view`: the JSON representations of the model, so model objects are never sent directly
-- `controller`: the HTTP handlers. They parse the request, call the model and answer with a view
+- `controller`: the HTTP handlers. They parse the request, call the model and answer with a view. The generic HTTP machinery (`Server`, `Router`, `Request`, `Response`, `Json`) is in `controller/http`, and each resource gets its own controller next to it
 
 Dependencies run `controller -> view -> model`. These rules are checked by `ArchitectureTests`.
 
@@ -128,6 +128,7 @@ server/src/main/java/it/chalmers/commit/
 ├── model/          Domain classes and rules, and all database access (Database, Hibernate entities).
 ├── view/           JSON shapes of what the API returns.
 └── controller/     HTTP handlers. Translate HTTP to calls on the model.
+    └── http/       The HTTP machinery: Server, Router, Request, Response, Json.
 server/src/test/java/it/chalmers/commit/
 └── ArchitectureTests.java
 ```
