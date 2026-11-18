@@ -5,7 +5,7 @@
 Monorepo with two separately built apps:
 
 ```
-server/   Spring Boot REST backend (Java 17, Maven)
+server/   REST backend (Java 17, Maven)
 web/      SvelteKit frontend (TypeScript, pnpm)
 ```
 
@@ -15,11 +15,20 @@ The web app talks to the server over HTTP. The server owns all domain logic and 
 
 ### Server (`server/`)
 
-- Spring Boot 4.1 (Java 17), package `it.chalmers.commit`
-- Spring Web MVC for the HTTP layer, Spring Security for auth, Bean Validation for input checks
-- Spring Data JPA with PostgreSQL (H2 for tests)
-- Actuator for health/metrics
-- Database connection is configured via `DB_URL`, `DB_USER`, `DB_PASSWORD` (defaults to a local `oop` database)
+- Java 17, package `it.chalmers.commit`, built with Maven into one runnable jar (`java -jar target/server.jar`)
+- No application framework. HTTP is the JDK's own `com.sun.net.httpserver.HttpServer`, with a small `Router` on top
+- Gson for JSON
+- Hibernate ORM (without Spring) with PostgreSQL, and Flyway for schema migrations in `src/main/resources/db/migration`. Hibernate only validates the schema, it never changes it
+- Settings come from environment variables: `DB_URL`, `DB_USER`, `DB_PASSWORD` (default to a local `oop` database), `PORT` (default 8080) and `WEB_ORIGIN` (the web app's origin for CORS, default `http://localhost:5173`)
+- All routes live under `/api`, and errors are JSON like `{"error": "message"}`
+
+#### Packages
+
+- `model`: the domain objects and all database access. A `Database` class owns the Hibernate `SessionFactory`, and collection-style classes (for example an `Events` class) use it, so nothing outside the model sees a Hibernate session. The model may use any library but must not depend on `view` or `controller`
+- `view`: the JSON representations of the model, so model objects are never sent directly
+- `controller`: the HTTP handlers. They parse the request, call the model and answer with a view. The generic HTTP machinery (`Server`, `Router`, `Request`, `Response`, `Json`) is in `controller/http`, and each resource gets its own controller next to it
+
+Dependencies run `controller -> view -> model`. These rules are checked by `ArchitectureTests`.
 
 ### Web (`web/`)
 
@@ -35,7 +44,7 @@ The web app talks to the server over HTTP. The server owns all domain logic and 
 
 Both apps are served on a single domain. The reverse proxy routes by path:
 
-- `/api/**` goes to the Spring server.
+- `/api/**` goes to the server.
 - Everything else goes to the SvelteKit web app.
 
 Consequences:
@@ -43,13 +52,13 @@ Consequences:
 - The server exposes its JSON REST API under `/api`. The web app is the only client.
 - The browser calls `/api` directly. It is the same origin, so no CORS setup is needed and the session cookie is sent automatically.
 - `/api` is reserved for the server. SvelteKit must not define routes under it, because the proxy would intercept them.
-- The server is publicly reachable, but only under `/api`. Spring Security guards every endpoint there.
+- The server is publicly reachable, but only under `/api`. Every endpoint there requires login unless noted (login is not built yet).
 - SvelteKit `load` functions may also call the server, over the private network and forwarding the user's cookie.
 - The limit to `/api` is enforced by the routing in Dokploy: only `/api` is forwarded to the server, so nothing else on it is reachable from outside.
 
 ## Authentication (Gamma)
 
-> Decided: Spring Security owns the login flow (see below). Not implemented yet. Gamma's user fields and group data are still to be verified.
+> Decided: the server implements the login flow itself, without Spring Security (see below). Not implemented yet. Gamma's user fields and group data are still to be verified.
 
 Login uses Gamma (the IT section's account system) over OAuth 2.0 authorization code flow.
 
@@ -59,7 +68,7 @@ Login uses Gamma (the IT section's account system) over OAuth 2.0 authorization 
 4. The user is stored or updated on our side and gets a session.
 5. Later requests from the web app to the server carry that session.
 
-- Decided: Spring Security acts as the OAuth client and owns the whole login flow. The web app forwards the session cookie to the server.
+- Decided: the server acts as the OAuth client and owns the whole login flow, using the JDK's `java.net.http.HttpClient` and server-side sessions kept in a cookie. The web app forwards the session cookie to the server.
 - Roles (e.g. organizer vs. student) are decided on the server, never trusted from the web app.
 - Local development needs either a Gamma dev client or a fake login, so the app can run without access to Gamma.
 
@@ -70,11 +79,11 @@ Requirements: Java 17, Node 24 (see `web/.nvmrc`), pnpm, PostgreSQL.
 | Part | Command | Default address |
 | --- | --- | --- |
 | Database | PostgreSQL with a database named `oop` | `localhost:5432` |
-| Server | `cd server && ./mvnw spring-boot:run` | `localhost:8080` |
+| Server | `cd server && ./mvnw package && java -jar target/server.jar` | `localhost:8080` |
 | Web | `cd web && pnpm install && pnpm dev` | `localhost:5173` |
 
 - Server DB settings: `DB_URL`, `DB_USER`, `DB_PASSWORD`. The defaults match a local Postgres with user and password `postgres`.
-- Tests use the in-memory H2 database (`./mvnw test`).
+- `./mvnw test` runs the tests. They need no database for now.
 - Production web build: `cd web && pnpm build && pnpm start` (runs `node build`).
 - Production server build: `cd server && ./mvnw package`, then run the jar with the DB variables set.
 - Hosted on a Dokploy instance.
@@ -110,29 +119,28 @@ The course requires a model-heavy MVC architecture where the model is entirely i
 
 | MVC part | Where it lives | Language |
 | --- | --- | --- |
-| Model | `server`, package `model` | Plain Java |
-| Controller | `server`, package `controller` (Spring REST controllers) | Java |
-| View | `web` (SvelteKit) | TypeScript / Svelte |
+| Model | `server`, package `model` | Java |
+| Controller | `server`, package `controller` (HTTP handlers) | Java |
+| View | `web` (SvelteKit) renders the UI. `server`, package `view`, holds the JSON shapes the API returns | TypeScript / Svelte, Java |
 
 ```
 server/src/main/java/it/chalmers/commit/
-├── model/          Domain classes and rules. Plain Java only.
-├── controller/     REST endpoints. Translate HTTP to calls on the model.
-├── persistence/    JPA entities and repository implementations.
-├── notification/   Notifiers such as EmailNotifier.
-└── auth/           Gamma login.
+├── model/          Domain classes and rules, and all database access (Database, Hibernate entities).
+├── view/           JSON shapes of what the API returns.
+└── controller/     HTTP handlers. Translate HTTP to calls on the model.
+    └── http/       The HTTP machinery: Server, Router, Request, Response, Json.
 server/src/test/java/it/chalmers/commit/
-└── model/          Unit tests for the model, run without Spring or a database.
+└── ArchitectureTests.java
 ```
 
 Rules:
 
-- **The model imports nothing from Spring, JPA or any other framework.** No annotations such as `@Entity` or `@Service` in `model`. It can be compiled and tested alone.
-- **Dependencies point inwards.** `controller`, `persistence`, `notification` and `auth` depend on `model`. `model` depends on none of them.
+- **The model may use any library, but never `view` or `controller`.** Hibernate annotations such as `@Entity` are fine in `model`.
+- **Dependencies point inwards.** `controller` depends on `view` and `model`, `view` depends on `model`. `model` depends on neither. `ArchitectureTests` enforces this.
 - **The model owns the rules.** Signing up, queueing, promotion, cancelling and status changes are methods on model classes, not logic in controllers or services.
-- **Controllers stay thin.** A controller loads model objects through a repository, calls one model method, saves the result and returns it.
-- **The model defines interfaces for what it needs from outside** (repositories, notifications, the current time). The other packages implement them. This is dependency inversion.
-- **The database is a detail.** `persistence` has its own JPA classes and maps them to and from model objects. The model classes are not database tables.
+- **Controllers stay thin.** A controller loads model objects through a collection class in `model` (for example `Events`), calls one model method, and returns a `view`.
+- **All database access lives in `model`.** A `Database` class owns the Hibernate `SessionFactory`. Controllers and views never import Hibernate, JDBC or Flyway, which `ArchitectureTests` also checks.
+- **The model's entities are the database tables.** The model classes carry the Hibernate annotations directly, and there is no separate persistence layer or mapper.
 
 ## Domain model
 
@@ -277,7 +285,7 @@ classDiagram
 - **FirstComeFirstServed:** promotes the `QUEUED` registration with the earliest `createdAt`.
 - **Weighted (optional):** a weighted queue. People still join in sign-up order, but each user's weight bumps them down the queue, so reliable users move ahead of unreliable ones who signed up earlier. The next person promoted is the one at the top of the weighted queue.
 
-**Weight.** It works like a grid penalty in motorsport: a user's weight is a number of places they drop from where they would otherwise start, based on past behaviour. The `WeightCalculator` computes it from the user's past registrations across all events, which it gets through the model-defined `RegistrationHistory` interface (implemented in `persistence`, see [Persistence and schema](#persistence-and-schema)):
+**Weight.** It works like a grid penalty in motorsport: a user's weight is a number of places they drop from where they would otherwise start, based on past behaviour. The `WeightCalculator` computes it from the user's past registrations across all events, which it gets through the model-defined `RegistrationHistory` interface (implemented in `model`, see [Persistence and schema](#persistence-and-schema)):
 
 ```
 weight = min(maxWeight, noShowWeight * noShows + lateCancelWeight * lateCancels)
@@ -325,23 +333,24 @@ classDiagram
 
 > Proposed. Nothing here is implemented yet.
 
-There are two things to keep in sync: the database schema with the JPA entities, and the JPA entities with the model classes.
+There is one thing to keep in sync: the database schema with the entity classes in `model`.
 
 ### Database schema and JPA entities
 
 - **Flyway migrations are the source of truth for the schema.** SQL files in `server/src/main/resources/db/migration/`, one per schema change.
-- **Hibernate only validates.** Set `spring.jpa.hibernate.ddl-auto=validate`. The server then refuses to start if an entity and the schema disagree, instead of drifting silently.
+- **Naming: `NNN__description.sql`**, for example `001__create_tables.sql` and `002__add_event_location.sql`. Numbers are zero-padded and count up. Never edit a migration that has been merged, add a new one instead.
+- **Drafting a migration:** change the entity, start the local database, then run `cd server && ./new-migration add_event_location`. It applies the existing migrations to the local database, asks Hibernate what SQL is missing to match the entities, and saves that as the next numbered file. Read the file before committing it: Hibernate treats a renamed column as a drop plus an add. Run it against your own local database, not the shared one.
+- **Hibernate only validates.** Set `hibernate.hbm2ddl.auto=validate`. The server then refuses to start if an entity and the schema disagree, instead of drifting silently.
 - **`update` is not safe.** It never drops or renames columns, so each teammate's local database and the Dokploy database slowly diverge from the entities. It is only acceptable during the first days, before the entities settle.
 - **Entity change and migration go in the same PR.** A change to a JPA entity without a migration is incomplete.
-- **Tests run the same migrations.** Tests on H2 apply the Flyway migrations rather than letting Hibernate create the tables.
 
-### Model classes and JPA entities
+### Model classes and entities
 
-- **Separate classes.** `persistence` has its own JPA entities, written by hand, and a mapper per aggregate that converts to and from the model classes. The model never sees an entity.
-- **Aggregate = `Event` with its `Registration`s.** The aggregate is loaded and saved as a whole through the repository, so `Event` can enforce its rules over all its registrations.
-- **Repositories.** The implementations live in `persistence` and implement the interfaces the model defines (`EventRepository`, `UserRepository`).
-- **Cross-event history needs its own interface.** The `WeightCalculator` in the weighted queue needs a user's past registrations across all events, which is not part of any `Event` aggregate. The model defines a separate interface for it (for example `RegistrationHistory`) and `persistence` implements it.
-- **Rejected: annotating the model classes directly with JPA.** It is less code, but it breaks the rule that `model` imports nothing from Spring or JPA, and ties the model's shape to the table layout.
+- **The model classes are the entities.** `Event`, `User` and the rest carry the Hibernate annotations directly. Entities need a `protected` no-argument constructor and non-final fields, but still have no public setters.
+- **Aggregate = `Event` with its `Registration`s.** The aggregate is loaded and saved as a whole, so `Event` can enforce its rules over all its registrations.
+- **Collection-style classes in `model`** (for example `Events`) load and save through `Database.inTransaction`. Nothing outside `model` sees a Hibernate session.
+- **Cross-event history lives in `model` too.** The `WeightCalculator` in the weighted queue needs a user's past registrations across all events, which is not part of any `Event` aggregate. A separate model class (for example `RegistrationHistory`) queries it.
+- **Rejected: a separate persistence layer with hand-written entities and mappers.** It keeps the model free of annotations, but doubles the classes. We chose less code over a model with no framework imports.
 
 ## API
 

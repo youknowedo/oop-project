@@ -1,0 +1,6 @@
+#!/bin/sh
+# Drafts the next database migration from the entity classes. Usage: ./new-migration add_event_location
+# Needs the local database from DB_URL, DB_USER and DB_PASSWORD to be running.
+cd "$(dirname "$0")" || exit 1
+./mvnw -q --batch-mode compile org.codehaus.mojo:exec-maven-plugin:3.7.0:java \
+  -Dexec.mainClass=it.chalmers.commit.NewMigration -Dexec.args="$1"

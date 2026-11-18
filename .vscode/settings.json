@@ -1,3 +1,19 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+	"java.configuration.updateBuildConfiguration": "interactive",
+
+	// Java formatting is owned by Spotless (google-java-format), the same thing CI checks. The
+	// editor's own Java formatter uses a different style, so it is off and Spotless runs on save.
+	"[java]": {
+		"editor.formatOnSave": false,
+		"editor.formatOnPaste": false,
+		"editor.formatOnType": false
+	},
+	"emeraldwalk.runonsave": {
+		"commands": [
+			{
+				"match": "\\.java$",
+				"cmd": "sh -c 'cd \"$(git rev-parse --show-toplevel)/server\" && ./mvnw -q --batch-mode spotless:apply -DspotlessFiles=\"${file}\"'"
+			}
+		]
+	}
 }
