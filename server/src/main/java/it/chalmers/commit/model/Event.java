@@ -35,7 +35,7 @@ public final class Event {
         if (currentStatus == EventStatus.CANCELLED || currentStatus == EventStatus.DONE) {
             throw new IllegalStateException("A cancelled or completed event cannot be cancelled");
         }
-        status = EventStatus.CANCELLED;
+        this.status = EventStatus.CANCELLED;
     }
 
     // A null deadline means signups remain open until the event starts.
@@ -53,7 +53,7 @@ public final class Event {
         if (capacity <= 0 || capacity < attendees.size()) {
             throw new IllegalArgumentException("Capacity must be positive and fit all attendees");
         }
-        if (status == EventStatus.PUBLISHED && !date.isAfter(LocalDateTime.now())) {
+        if (this.status == EventStatus.PUBLISHED && !date.isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("A published event must start in the future");
         }
 
@@ -66,19 +66,19 @@ public final class Event {
     }
 
     public void publishEvent() {
-        if (status != EventStatus.DRAFT) {
+        if (this.status != EventStatus.DRAFT) {
             throw new IllegalStateException("Only draft events can be published");
         }
         if (!date.isAfter(LocalDateTime.now())) {
             throw new IllegalStateException("An event must start in the future to be published");
         }
-        status = EventStatus.PUBLISHED;
+        this.status = EventStatus.PUBLISHED;
     }
 
     // Refresh on access; no background task or thread is created per event.
     private void startEvent() {
-        if (status == EventStatus.PUBLISHED && !LocalDateTime.now().isBefore(date)) {
-            status = EventStatus.ONGOING;
+        if (this.status == EventStatus.PUBLISHED && !LocalDateTime.now().isBefore(date)) {
+            this.status = EventStatus.ONGOING;
         }
     }
 
@@ -86,7 +86,7 @@ public final class Event {
         if (getStatus() != EventStatus.ONGOING) {
             throw new IllegalStateException("Only ongoing events can be completed");
         }
-        status = EventStatus.DONE;
+        this.status = EventStatus.DONE;
     }
 
     public int getAvailableSpots() {
@@ -193,7 +193,7 @@ public final class Event {
 
     public EventStatus getStatus() {
         startEvent();
-        return status;
+        return this.status;
     }
 
     // Immutable snapshots keep callers from bypassing signup rules.
