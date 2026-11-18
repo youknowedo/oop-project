@@ -1,4 +1,4 @@
-package it.chalmers.commit.controller;
+package it.chalmers.commit.controller.http;
 
 /** Thrown by a handler to answer with an error status instead of a normal response. */
 public class HttpException extends RuntimeException {

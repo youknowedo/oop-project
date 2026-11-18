@@ -1,5 +1,7 @@
 package it.chalmers.commit.controller;
 
+import it.chalmers.commit.controller.http.Response;
+import it.chalmers.commit.controller.http.Router;
 import it.chalmers.commit.view.HealthView;
 
 /** Lets the web app and deployments check that the server is up. */

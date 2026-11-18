@@ -1,4 +1,4 @@
-package it.chalmers.commit.controller;
+package it.chalmers.commit.controller.http;
 
 /** Handles one route. */
 @FunctionalInterface

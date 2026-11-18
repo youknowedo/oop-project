@@ -1,4 +1,4 @@
-package it.chalmers.commit.controller;
+package it.chalmers.commit.controller.http;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

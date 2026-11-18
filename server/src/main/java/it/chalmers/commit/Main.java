@@ -1,8 +1,8 @@
 package it.chalmers.commit;
 
 import it.chalmers.commit.controller.HealthController;
-import it.chalmers.commit.controller.Router;
-import it.chalmers.commit.controller.Server;
+import it.chalmers.commit.controller.http.Router;
+import it.chalmers.commit.controller.http.Server;
 import it.chalmers.commit.model.Database;
 import java.io.IOException;
 

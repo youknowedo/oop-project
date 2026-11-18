@@ -1,4 +1,4 @@
-package it.chalmers.commit.controller;
+package it.chalmers.commit.controller.http;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;

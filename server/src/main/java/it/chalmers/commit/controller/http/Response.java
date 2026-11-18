@@ -1,4 +1,4 @@
-package it.chalmers.commit.controller;
+package it.chalmers.commit.controller.http;
 
 /** What a handler answers with: a status code and an object that is sent as JSON. */
 public record Response(int status, Object body) {
