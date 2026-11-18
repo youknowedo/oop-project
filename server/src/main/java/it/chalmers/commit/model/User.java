@@ -1,4 +1,4 @@
-package it.chalmers.commit;
+package it.chalmers.commit.model;
 
 import java.util.ArrayList;
 import java.util.List;
