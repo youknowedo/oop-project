@@ -5,7 +5,7 @@
 Monorepo with two separately built apps:
 
 ```
-server/   Spring Boot REST backend (Java 17, Maven)
+server/   REST backend (Java 17, Maven)
 web/      SvelteKit frontend (TypeScript, pnpm)
 ```
 
@@ -15,11 +15,20 @@ The web app talks to the server over HTTP. The server owns all domain logic and 
 
 ### Server (`server/`)
 
-- Spring Boot 4.1 (Java 17), package `it.chalmers.commit`
-- Spring Web MVC for the HTTP layer, Spring Security for auth, Bean Validation for input checks
-- Spring Data JPA with PostgreSQL (H2 for tests)
-- Actuator for health/metrics
-- Database connection is configured via `DB_URL`, `DB_USER`, `DB_PASSWORD` (defaults to a local `oop` database)
+- Java 17, package `it.chalmers.commit`, built with Maven into one runnable jar (`java -jar target/server.jar`)
+- No application framework. HTTP is the JDK's own `com.sun.net.httpserver.HttpServer`, with a small `Router` on top
+- Gson for JSON
+- Hibernate ORM (without Spring) with PostgreSQL, and Flyway for schema migrations in `src/main/resources/db/migration`. Hibernate only validates the schema, it never changes it
+- Settings come from environment variables: `DB_URL`, `DB_USER`, `DB_PASSWORD` (default to a local `oop` database), `PORT` (default 8080) and `WEB_ORIGIN` (the web app's origin for CORS, default `http://localhost:5173`)
+- All routes live under `/api`, and errors are JSON like `{"error": "message"}`
+
+#### Packages
+
+- `model`: the domain objects and all database access. A `Database` class owns the Hibernate `SessionFactory`, and collection-style classes (for example an `Events` class) use it, so nothing outside the model sees a Hibernate session. The model may use any library but must not depend on `view` or `controller`
+- `view`: the JSON representations of the model, so model objects are never sent directly
+- `controller`: the HTTP handlers. They parse the request, call the model and answer with a view
+
+Dependencies run `controller -> view -> model`. These rules are checked by `ArchitectureTests`.
 
 ### Web (`web/`)
 
@@ -50,19 +59,6 @@ The web app talks to the server over HTTP. The server owns all domain logic and 
 ## Classes
 
 ```java
-class Master = {
-    db: DbClient;
-    events: Events[];
-
-    createEvent();
-    changeEvent();
-    deleteEvent();
-
-    createRequest();
-    ...,
-}
-
-
 class User = {
     id: string;
     name: string;

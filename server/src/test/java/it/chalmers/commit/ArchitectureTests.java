@@ -1,6 +1,6 @@
 package it.chalmers.commit;
 
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
@@ -14,24 +14,49 @@ class ArchitectureTests {
 
   private static final String ROOT = "it.chalmers.commit";
   private static final String MODEL = ROOT + ".model..";
+  private static final String VIEW = ROOT + ".view..";
+  private static final String CONTROLLER = ROOT + ".controller..";
 
   private static final JavaClasses CLASSES =
       new ClassFileImporter()
           .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
           .importPackages(ROOT);
 
-  /**
-   * Covers both "no framework code in the model" and "dependencies point inwards": the model may
-   * only use the JDK and itself, so it cannot reach Spring, JPA or any of our other packages.
-   */
+  /** The model can use any library, but must not know about how it is shown or requested. */
   @Test
-  void modelDependsOnlyOnTheJdkAndItself() {
-    classes()
+  void modelDoesNotDependOnViewOrController() {
+    noClasses()
         .that()
         .resideInAPackage(MODEL)
         .should()
-        .onlyDependOnClassesThat()
-        .resideInAnyPackage(MODEL, "java..")
+        .dependOnClassesThat()
+        .resideInAnyPackage(VIEW, CONTROLLER)
+        .allowEmptyShould(true)
+        .check(CLASSES);
+  }
+
+  @Test
+  void viewDoesNotDependOnController() {
+    noClasses()
+        .that()
+        .resideInAPackage(VIEW)
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage(CONTROLLER)
+        .allowEmptyShould(true)
+        .check(CLASSES);
+  }
+
+  /** Database code belongs in the model, so controllers and views never touch Hibernate or JDBC. */
+  @Test
+  void onlyTheModelUsesTheDatabase() {
+    noClasses()
+        .that()
+        .resideInAnyPackage(VIEW, CONTROLLER)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "org.hibernate..", "jakarta.persistence..", "java.sql..", "org.flywaydb..")
         .allowEmptyShould(true)
         .check(CLASSES);
   }
