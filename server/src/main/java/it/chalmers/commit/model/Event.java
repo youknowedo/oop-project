@@ -8,14 +8,57 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Integration requirements for the teammates working on the other models:
- * - User needs public String getId(), returning a stable, nonblank user ID.
- * - Signup needs public Signup(User user, Event event, Info info), storing those fields.
- * No Signup getters or custom Queue methods are needed by this class.
- * The trailing comma after String[] allergies in User's constructor must also be removed
- * for the project to compile. These supporting changes are intentionally left to their owners.
+ * Self-contained event model: Java collections manage attendees and the FIFO queue.
+ * TEMPORARY: The nested User, Info and Signup types are compilation placeholders
+ * until the team's actual model classes are available.
+ *
+ * TODO: When integrating the team's User.java, Info.java and Signup.java, remove the
+ * nested types below so these names refer to the classes in this package instead.
+ * User must provide public String getId(). Signup must provide the constructor
+ * public Signup(User user, Event event, Info info), storing all three arguments.
+ * No Signup getters, Info methods, custom Queue class or Role enum are required here.
+ * Callers currently use Event.User, Event.Info and Event.Signup; update those references
+ * to the team's model classes during integration. Adding the files alone is not enough,
+ * because nested types take precedence over package-level classes with the same names.
  */
 public final class Event {
+    /**
+     * TEMPORARY compilation placeholder for User.java. Implementations must return a unique,
+     * stable, nonblank ID. For a quick example: Event.User guest = () -> "guest-1";
+     * TODO fix: Implement public String getId() in the team's package-level User class,
+     * then delete this nested interface. Replace Event.User references in callers with User
+     * and replace temporary lambdas with actual User objects.
+     */
+    @FunctionalInterface
+    public interface User {
+        String getId();
+    }
+
+    /**
+     * TEMPORARY compilation placeholder for Info.java; Event calls no methods on it.
+     * TODO fix: Implement the team's package-level Info class with the agreed signup data,
+     * then delete this nested interface. Replace Event.Info references and temporary
+     * interface implementations in callers with actual Info objects.
+     */
+    public interface Info {
+    }
+
+    /**
+     * TEMPORARY compilation placeholder for Signup.java. This immutable record supplies
+     * the constructor and the accessors user(), event(), info().
+     * TODO fix: Implement public Signup(User user, Event event, Info info) in the team's
+     * package-level Signup class, storing and validating all three arguments. Then delete
+     * this nested record and replace Event.Signup references in callers with Signup.
+     * If callers use record accessors, adapt them to the team's getters (e.g. getUser()).
+     */
+    public record Signup(User user, Event event, Info info) {
+        public Signup {
+            Objects.requireNonNull(user, "User is required");
+            Objects.requireNonNull(event, "Event is required");
+            Objects.requireNonNull(info, "Signup info is required");
+        }
+    }
+
     private final String id;
     private final User poster;
     private String name;
@@ -118,7 +161,8 @@ public final class Event {
         }
 
         Objects.requireNonNull(info, "Signup info is required");
-        // Requires Signup(User, Event, Info); see the integration notes above.
+        // Uses the nested record for now. The team's Signup must offer this constructor.
+        // 'this' is the event the guest is signing up for.
         Signup signup = new Signup(guest, this, info);
         if (getAvailableSpots() > 0) {
             attendees.put(userId, signup);
@@ -160,7 +204,8 @@ public final class Event {
 
     private static String requireUserId(User user) {
         Objects.requireNonNull(user, "User is required");
-        // User's owner must expose its ID through public String getId().
+        // Uses the nested interface for now. The team's User must also expose getId().
+        // The same user must keep the same ID across instances and signup/cancellation calls.
         return requireText(user.getId(), "User ID");
     }
 
