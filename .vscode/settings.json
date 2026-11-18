@@ -1,4 +1,6 @@
 {
+	"java.configuration.updateBuildConfiguration": "interactive",
+
 	// Java formatting is owned by Spotless (google-java-format), the same thing CI checks. The
 	// editor's own Java formatter uses a different style, so it is off and Spotless runs on save.
 	"[java]": {
