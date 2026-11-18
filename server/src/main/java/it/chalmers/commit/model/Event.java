@@ -99,6 +99,12 @@ public final class Event {
                 && LocalDateTime.now().isBefore(signupDeadline);
     }
 
+    // TODO(team): When merging the Signup and Queue implementations, check which signup
+    // operations they already handle. Delegate through their agreed APIs and remove duplicated
+    // validation, duplicate detection, Signup creation or queue insertion below where applicable.
+    // Keep event-specific rules enforced: signups must be open, each user can register only once,
+    // and confirmed attendees must not exceed capacity. If another component handles the entire
+    // signup flow, replace this body with delegation rather than maintaining two implementations.
     public Signup signUp(User guest, Info info) {
         if (!canSignup()) {
             throw new IllegalStateException("Signups are closed for this event");
@@ -121,6 +127,10 @@ public final class Event {
     }
 
     // Allow withdrawals after the signup deadline, but only before the event starts.
+    // TODO(team): If the merged Signup/Queue code handles cancellation, delegate to its API and
+    // remove duplicated attendee/queue removal and promotion logic below. Ensure cancellation
+    // still respects the event's status, removes the registration from the correct collection,
+    // and promotes the next queued signup exactly once when an attendee's spot becomes available.
     public void cancelSignup(User guest) {
         if (getStatus() != EventStatus.PUBLISHED) {
             throw new IllegalStateException("Signups can only be cancelled before the event starts");
@@ -134,6 +144,14 @@ public final class Event {
         }
     }
 
+    // TODO(team): When merging the self-implemented Queue class, replace the map iterator
+    // logic below with Queue's API for getting/removing the next signup. Remove the duplicated
+    // queue-ordering and removal logic here; let Queue determine who is next. Event should still
+    // fill available spots and add promoted signups to attendees. If Queue already handles the
+    // entire promotion process, remove this method and replace its calls in updateEvent() and
+    // cancelSignup() with the agreed Queue operation. Also adapt the queue field, signUp(),
+    // duplicate detection, cancellation and getQueue() to that API, removing obsolete map code
+    // and the Iterator import once it is no longer used.
     private void fillAvailableSpots() {
         Iterator<Map.Entry<String, Signup>> iterator = queue.entrySet().iterator();
         while (getAvailableSpots() > 0 && iterator.hasNext()) {
