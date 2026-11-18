@@ -1,4 +1,6 @@
 package it.chalmers.commit.notification;
 
-public class NotificationObserver {
-}
+public interface NotificationObserver {
+
+    public void notify(String subjectString, String messageString);
+} 
