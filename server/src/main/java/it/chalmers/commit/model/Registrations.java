@@ -30,28 +30,26 @@ public class Registrations {
     return registrations.removeIf(r -> r.getUser().equals(user));
   }
 
-  /**
-   * The user's 1-based place in the queue, or empty if they are not queued. This is the order of
-   * arrival, so it only matches the admission order for strategies like FIFO.
-   */
+  /** The user's 1-based place in the admission order, or empty if they are not queued. */
   public Optional<Integer> positionOf(User user) {
     int index = queue().indexOf(find(user).orElse(null));
     return index < 0 ? Optional.empty() : Optional.of(index + 1);
   }
 
-  /** A read-only view of everyone waiting, in order of arrival. */
+  /** A read-only view of everyone waiting, in the order they will be admitted. */
   public List<Registration> queue() {
-    return withStatus(RegistrationStatus.QUEUED);
+    return Collections.unmodifiableList(
+        strategy.order(withStatus(RegistrationStatus.QUEUED)));
   }
 
   /** A read-only view of everyone admitted, in order of arrival. */
   public List<Registration> attendees() {
-    return withStatus(RegistrationStatus.ATTENDING);
+    return Collections.unmodifiableList(withStatus(RegistrationStatus.ATTENDING));
   }
 
-  /** Admits the next queued user chosen by the strategy and returns their registration. */
+  /** Admits the first user in the queue and returns their registration. */
   public Optional<Registration> admitNext() {
-    Optional<Registration> next = strategy.nextToPromote(queue());
+    Optional<Registration> next = queue().stream().findFirst();
     next.ifPresent(Registration::admit);
     return next;
   }
@@ -61,7 +59,6 @@ public class Registrations {
   }
 
   private List<Registration> withStatus(RegistrationStatus status) {
-    return Collections.unmodifiableList(
-        registrations.stream().filter(r -> r.getStatus() == status).toList());
+    return registrations.stream().filter(r -> r.getStatus() == status).toList();
   }
 }

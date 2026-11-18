@@ -191,7 +191,7 @@ Enums: `Role` (STUDENT, ORGANIZER), `EventStatus` (DRAFT, PUBLISHED, CANCELLED, 
 - **Event owns its registrations.** An event holds its `Registration` objects and is the only thing that creates or changes them. Other code asks the event, e.g. `event.signUp(user, now)`.
 - **Registration** is one user's sign-up for one event. The attendee list and the queue are both registrations, told apart by `status`.
 - **Signing up:** `signUp` checks that the event is published and sign-up has opened, then creates a registration that is `ATTENDING` if there is a free spot and `QUEUED` otherwise.
-- **Queue promotion:** when an attending registration is cancelled, or the capacity is raised, the event asks its `AllocationStrategy` who is next and makes that registration `ATTENDING`.
+- **Queue promotion:** when an attending registration is cancelled, or the capacity is raised, the event takes the first registration in the order given by its `AllocationStrategy` and makes it `ATTENDING`.
 - **Illegal changes are rejected by the model itself**, for example signing up twice or cancelling a registration that is already cancelled.
 - **Time is passed in.** Methods that depend on the current time take it as a parameter, so the model never reads the system clock and tests can choose the time.
 
@@ -265,7 +265,7 @@ How spots are given out is behind an interface, so the rule can change without t
 classDiagram
     class AllocationStrategy {
         <<interface>>
-        nextToPromote(queue) Registration
+        order(queue) List~Registration~
     }
     class FirstComeFirstServed
     class Weighted
@@ -282,8 +282,8 @@ classDiagram
     WeightCalculator --> RegistrationHistory
 ```
 
-- **FirstComeFirstServed:** promotes the `QUEUED` registration with the earliest `createdAt`.
-- **Weighted (optional):** a weighted queue. People still join in sign-up order, but each user's weight bumps them down the queue, so reliable users move ahead of unreliable ones who signed up earlier. The next person promoted is the one at the top of the weighted queue.
+- **FirstComeFirstServed:** orders the `QUEUED` registrations by `createdAt`, earliest first.
+- **Weighted (optional):** a weighted queue. People still join in sign-up order, but each user's weight bumps them down the queue, so reliable users move ahead of unreliable ones who signed up earlier. The strategy returns the queue sorted this way, so a user's queue position and who is promoted next always agree.
 
 **Weight.** It works like a grid penalty in motorsport: a user's weight is a number of places they drop from where they would otherwise start, based on past behaviour. The `WeightCalculator` computes it from the user's past registrations across all events, which it gets through the model-defined `RegistrationHistory` interface (implemented in `model`, see [Persistence and schema](#persistence-and-schema)):
 
