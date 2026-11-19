@@ -1,5 +1,4 @@
 package it.chalmers.commit.model;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
@@ -43,19 +42,24 @@ public class Event {
     }
     public void signUp(User user, LocalDateTime now) {
         int attending = 0;
+        
         for (Registration registration: registrations) {
+           
+            if (registration.getUser().getId().equals(user.getId())) {
+                throw new IllegalStateException("User is already signed up for this event");
+            
+            }
+    
+            
             if (registration.getStatus() == RegistrationStatus.ATTENDING) {
                 attending ++;
             }
         } 
 
-        if (registration.getuser().getId().equals(user.getId())) {
-            throw new IllegalStateException("User is already signed up for this event")
-        }
         if (this.status != EventStatus.PUBLISHED ||
             now.isBefore(this.signUpOpens)) {
                 throw new IllegalStateException(" Event is not open for sign up");
-            }            
+        }            
             
         if (attending < this.capacity) {
             Registration registration = new Registration(
@@ -63,11 +67,10 @@ public class Event {
                 RegistrationStatus.ATTENDING, 
                 now
             );
-            
+        
             registrations.add(registration);
 
-        }  else { 
-            
+        } else {     
             Registration registration = new Registration(
                     user, 
                     RegistrationStatus.QUEUED, 
