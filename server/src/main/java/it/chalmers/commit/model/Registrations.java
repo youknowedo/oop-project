@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Everyone who has signed up, in order of arrival. Each registration is either queued or
- * attending, so the admitted students and the waiting list are two views of the same list.
+ * Everyone who has signed up, in order of arrival. Each registration is either queued or attending,
+ * so the admitted students and the waiting list are two views of the same list.
  */
 public class Registrations {
 
@@ -38,8 +38,7 @@ public class Registrations {
 
   /** A read-only view of everyone waiting, in the order they will be admitted. */
   public List<Registration> queue() {
-    return Collections.unmodifiableList(
-        strategy.order(withStatus(RegistrationStatus.QUEUED)));
+    return Collections.unmodifiableList(strategy.order(withStatus(RegistrationStatus.QUEUED)));
   }
 
   /** A read-only view of everyone admitted, in order of arrival. */
