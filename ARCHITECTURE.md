@@ -99,7 +99,7 @@ User stories live in the GitHub issues. This is the short list they roll up to.
 - Post events (publish them so users can see them)
 - Sign up for an event
 - Queueing system: when an event is full, sign-ups join a queue and are promoted when a spot frees up
-- Saved information for end users (e.g. allergies), reused when signing up
+- Saved food preferences for end users (e.g. vegetarian), reused when signing up
 - Login with Gamma
 - Notifications and reminders
 
@@ -155,7 +155,7 @@ classDiagram
         -String id
         -String name
         -Role role
-        -List~String~ allergies
+        -List~String~ foodPreferences
     }
     class Event {
         -String id
@@ -366,7 +366,7 @@ There is one thing to keep in sync: the database schema with the entity classes 
 | POST | `/events/{id}/signups` | Sign up for an event. Joins the queue if the event is full | Any user |
 | DELETE | `/events/{id}/signups/me` | Cancel own sign-up. Next in queue is promoted | Signed-up user |
 | GET | `/events/{id}/signups` | See attendees and queue | Event's organizer |
-| GET | `/me` | Current user and saved information (e.g. allergies) | Any user |
+| GET | `/me` | Current user and saved food preferences (e.g. vegetarian) | Any user |
 | PUT | `/me` | Update saved information | Any user |
 | GET | `/me/signups` | The user's sign-ups and queue positions | Any user |
 

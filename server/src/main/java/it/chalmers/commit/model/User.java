@@ -7,25 +7,25 @@ public class User {
   private String id;
   private String name;
   private UserRole role;
-  private List<String> allergies;
+  private List<String> foodPreferences;
 
-  public User(String id, String name, UserRole role, List<String> allergies) {
+  public User(String id, String name, UserRole role, List<String> foodPreferences) {
     this.id = id;
     this.name = name;
     this.role = role;
-    this.allergies = new ArrayList<>(allergies);
+    this.foodPreferences = new ArrayList<>(foodPreferences);
   }
 
-  public void addAllergy(String allergy) {
-    allergies.add(allergy);
+  public void addFoodPreference(String foodPreference) {
+    foodPreferences.add(foodPreference);
   }
 
-  public void removeAllergy(String allergy) {
-    allergies.remove(allergy);
+  public void removeFoodPreference(String foodPreference) {
+    foodPreferences.remove(foodPreference);
   }
 
-  public List<String> getAllergies() {
-    return allergies;
+  public List<String> getFoodPreferences() {
+    return foodPreferences;
   }
 
   public String getName() {
