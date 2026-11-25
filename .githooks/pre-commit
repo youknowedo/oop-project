@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Pre-commit formatting. Formats staged files with the same tools CI checks with
+# (Spotless for server, Prettier for web) and re-stages them. If a file is only
+# partly staged, it is checked but not rewritten, so unstaged edits never slip
+# into the commit. Enable with scripts/install-hooks.sh.
+set -euo pipefail
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+staged() { git diff --cached --name-only --diff-filter=ACMR -- "$@"; }
+unstaged() { git diff --name-only -- "$@"; }
+failed=0
+
+# Prints the staged files (from the given list on stdin) that also have unstaged edits.
+partial() { comm -12 <(sort) <(unstaged | sort); }
+
+# Server: Spotless (google-java-format).
+server_files=$(staged 'server/*.java')
+if [ -n "$server_files" ]; then
+	if [ -n "$(printf '%s\n' "$server_files" | partial)" ]; then
+		echo "pre-commit: some Java files are partly staged, checking instead of formatting"
+		(cd server && ./mvnw --batch-mode --quiet spotless:check) || {
+			echo "  fix with: (cd server && ./mvnw spotless:apply), then re-stage" >&2
+			failed=1
+		}
+	else
+		echo "pre-commit: formatting server files (Spotless)"
+		# Match by repo-relative path with either slash, since Windows paths use backslashes.
+		regex=$(printf '%s\n' "$server_files" | sed -e 's|/|[/\\\\]|g' -e 's|^|.*|' | paste -sd'|' -)
+		(cd server && ./mvnw --batch-mode --quiet spotless:apply "-DspotlessFiles=$regex") || failed=1
+		printf '%s\n' "$server_files" | xargs git add --
+	fi
+fi
+
+# Web: Prettier.
+web_files=$(staged 'web/*' | grep -E '\.(svelte|ts|js|json|css|html|md)$' || true)
+if [ -n "$web_files" ]; then
+	if [ ! -x web/node_modules/.bin/prettier ]; then
+		echo "pre-commit: skipping web formatting, run 'cd web && pnpm install' first" >&2
+	else
+		rel=()
+		while IFS= read -r f; do rel+=("${f#web/}"); done <<<"$web_files"
+		if [ -n "$(printf '%s\n' "$web_files" | partial)" ]; then
+			echo "pre-commit: some web files are partly staged, checking instead of formatting"
+			(cd web && node_modules/.bin/prettier --check --ignore-unknown "${rel[@]}") || {
+				echo "  fix with: (cd web && pnpm format), then re-stage" >&2
+				failed=1
+			}
+		else
+			echo "pre-commit: formatting web files (Prettier)"
+			(cd web && node_modules/.bin/prettier --write --ignore-unknown "${rel[@]}" >/dev/null) || failed=1
+			printf '%s\n' "$web_files" | xargs git add --
+		fi
+	fi
+fi
+
+if [ "$failed" -ne 0 ]; then
+	echo "pre-commit: failed (use --no-verify to skip)." >&2
+	exit 1
+fi

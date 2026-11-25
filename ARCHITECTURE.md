@@ -86,6 +86,7 @@ Requirements: Java 17, Node 24 (see `web/.nvmrc`), pnpm, PostgreSQL.
 - `./mvnw test` runs the tests. They need no database for now.
 - Production web build: `cd web && pnpm build && pnpm start` (runs `node build`).
 - Production server build: `cd server && ./mvnw package`, then run the jar with the DB variables set.
+- Pre-commit hook: run `scripts/install-hooks.sh` once per clone. It formats staged files with Spotless (server) and Prettier (web), the tools CI checks with, and re-stages them. Partly staged files are only checked. Skip with `git commit --no-verify`.
 - Hosted on a Dokploy instance.
 - CI (GitHub Actions) runs on every PR. Server: `./mvnw verify` (compile, tests including the architecture rules, Spotless formatting). Web: Prettier check, `svelte-check` and build.
 

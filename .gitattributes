@@ -1,0 +1,4 @@
+# Hooks run in bash, even on Windows, so they must keep LF endings.
+.githooks/* text eol=lf
+scripts/*.sh text eol=lf
+server/mvnw text eol=lf
