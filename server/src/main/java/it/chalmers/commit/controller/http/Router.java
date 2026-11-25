@@ -57,7 +57,9 @@ public class Router implements HttpHandler {
     try (exchange) {
       if (exchange.getRequestMethod().equals("OPTIONS")) {
         exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
+        exchange
+            .getResponseHeaders()
+            .add("Access-Control-Allow-Headers", "Content-Type, X-User-Id");
         exchange.sendResponseHeaders(204, -1);
         return;
       }
@@ -81,15 +83,29 @@ public class Router implements HttpHandler {
       }
       String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
       try {
-        return route.handler().handle(new Request(method, params.get(), body));
+        return route.handler().handle(new Request(method, params.get(), headers(exchange), body));
       } catch (HttpException e) {
         return error(e.status(), e.getMessage());
+      } catch (IllegalArgumentException | NullPointerException e) {
+        // The model rejects bad input this way, for example a blank name or a missing date.
+        return error(400, e.getMessage());
+      } catch (IllegalStateException e) {
+        // The model rejects changes that are not allowed right now, for example signing up late.
+        return error(409, e.getMessage());
       } catch (Exception e) {
         e.printStackTrace();
         return error(500, "Internal server error");
       }
     }
     return pathExists ? error(405, "Method not allowed") : error(404, "Not found");
+  }
+
+  private static Map<String, String> headers(HttpExchange exchange) {
+    Map<String, String> headers = new HashMap<>();
+    exchange
+        .getRequestHeaders()
+        .forEach((name, values) -> headers.put(name.toLowerCase(), values.get(0)));
+    return headers;
   }
 
   private static Response error(int status, String message) {
