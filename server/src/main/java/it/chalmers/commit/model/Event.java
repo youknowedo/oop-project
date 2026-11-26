@@ -7,14 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Integration requirements for the teammates working on the other models:
- * - User needs public String getId(), returning a stable, nonblank user ID.
- * - Signup needs public Signup(User user, Event event, Info info), storing those fields.
- * No Signup getters or custom Queue methods are needed by this class.
- * The trailing comma after String[] allergies in User's constructor must also be removed
- * for the project to compile. These supporting changes are intentionally left to their owners.
- */
+/** An event with lifecycle rules, attendee signups and a FIFO waiting queue. */
 public final class Event {
     private final String id;
     private final User poster;
@@ -28,7 +21,6 @@ public final class Event {
     // Keying signups by user ID prevents duplicates, even across User instances.
     private final Map<String, Signup> attendees = new LinkedHashMap<>();
     // LinkedHashMap preserves arrival order and supports fast removal by user ID.
-    // This uses only Java collections, independently of the project's Queue class.
     private final Map<String, Signup> queue = new LinkedHashMap<>();
 
     public Event(String id, User poster, String name, String description,
@@ -43,7 +35,7 @@ public final class Event {
         if (currentStatus == EventStatus.CANCELLED || currentStatus == EventStatus.DONE) {
             throw new IllegalStateException("A cancelled or completed event cannot be cancelled");
         }
-        status = EventStatus.CANCELLED;
+        this.status = EventStatus.CANCELLED;
     }
 
     // A null deadline means signups remain open until the event starts.
@@ -61,7 +53,7 @@ public final class Event {
         if (capacity <= 0 || capacity < attendees.size()) {
             throw new IllegalArgumentException("Capacity must be positive and fit all attendees");
         }
-        if (status == EventStatus.PUBLISHED && !date.isAfter(LocalDateTime.now())) {
+        if (this.status == EventStatus.PUBLISHED && !date.isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("A published event must start in the future");
         }
 
@@ -74,19 +66,19 @@ public final class Event {
     }
 
     public void publishEvent() {
-        if (status != EventStatus.DRAFT) {
+        if (this.status != EventStatus.DRAFT) {
             throw new IllegalStateException("Only draft events can be published");
         }
         if (!date.isAfter(LocalDateTime.now())) {
             throw new IllegalStateException("An event must start in the future to be published");
         }
-        status = EventStatus.PUBLISHED;
+        this.status = EventStatus.PUBLISHED;
     }
 
     // Refresh on access; no background task or thread is created per event.
     private void startEvent() {
-        if (status == EventStatus.PUBLISHED && !LocalDateTime.now().isBefore(date)) {
-            status = EventStatus.ONGOING;
+        if (this.status == EventStatus.PUBLISHED && !LocalDateTime.now().isBefore(date)) {
+            this.status = EventStatus.ONGOING;
         }
     }
 
@@ -94,7 +86,7 @@ public final class Event {
         if (getStatus() != EventStatus.ONGOING) {
             throw new IllegalStateException("Only ongoing events can be completed");
         }
-        status = EventStatus.DONE;
+        this.status = EventStatus.DONE;
     }
 
     public int getAvailableSpots() {
@@ -107,6 +99,12 @@ public final class Event {
                 && LocalDateTime.now().isBefore(signupDeadline);
     }
 
+    // TODO(team): When merging the Signup and Queue implementations, check which signup
+    // operations they already handle. Delegate through their agreed APIs and remove duplicated
+    // validation, duplicate detection, Signup creation or queue insertion below where applicable.
+    // Keep event-specific rules enforced: signups must be open, each user can register only once,
+    // and confirmed attendees must not exceed capacity. If another component handles the entire
+    // signup flow, replace this body with delegation rather than maintaining two implementations.
     public Signup signUp(User guest, Info info) {
         if (!canSignup()) {
             throw new IllegalStateException("Signups are closed for this event");
@@ -118,7 +116,7 @@ public final class Event {
         }
 
         Objects.requireNonNull(info, "Signup info is required");
-        // Requires Signup(User, Event, Info); see the integration notes above.
+        // 'this' is the event the guest is signing up for.
         Signup signup = new Signup(guest, this, info);
         if (getAvailableSpots() > 0) {
             attendees.put(userId, signup);
@@ -129,6 +127,10 @@ public final class Event {
     }
 
     // Allow withdrawals after the signup deadline, but only before the event starts.
+    // TODO(team): If the merged Signup/Queue code handles cancellation, delegate to its API and
+    // remove duplicated attendee/queue removal and promotion logic below. Ensure cancellation
+    // still respects the event's status, removes the registration from the correct collection,
+    // and promotes the next queued signup exactly once when an attendee's spot becomes available.
     public void cancelSignup(User guest) {
         if (getStatus() != EventStatus.PUBLISHED) {
             throw new IllegalStateException("Signups can only be cancelled before the event starts");
@@ -142,6 +144,14 @@ public final class Event {
         }
     }
 
+    // TODO(team): When merging the self-implemented Queue class, replace the map iterator
+    // logic below with Queue's API for getting/removing the next signup. Remove the duplicated
+    // queue-ordering and removal logic here; let Queue determine who is next. Event should still
+    // fill available spots and add promoted signups to attendees. If Queue already handles the
+    // entire promotion process, remove this method and replace its calls in updateEvent() and
+    // cancelSignup() with the agreed Queue operation. Also adapt the queue field, signUp(),
+    // duplicate detection, cancellation and getQueue() to that API, removing obsolete map code
+    // and the Iterator import once it is no longer used.
     private void fillAvailableSpots() {
         Iterator<Map.Entry<String, Signup>> iterator = queue.entrySet().iterator();
         while (getAvailableSpots() > 0 && iterator.hasNext()) {
@@ -160,7 +170,7 @@ public final class Event {
 
     private static String requireUserId(User user) {
         Objects.requireNonNull(user, "User is required");
-        // User's owner must expose its ID through public String getId().
+        // The same user must keep the same ID across instances and signup/cancellation calls.
         return requireText(user.getId(), "User ID");
     }
 
@@ -201,7 +211,7 @@ public final class Event {
 
     public EventStatus getStatus() {
         startEvent();
-        return status;
+        return this.status;
     }
 
     // Immutable snapshots keep callers from bypassing signup rules.

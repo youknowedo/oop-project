@@ -1,0 +1,59 @@
+name: Protected paths
+
+# Changes to the model package or ARCHITECTURE.md need three approvals. The repository is owned
+# by a user account, so it has no teams and rulesets cannot require extra reviewers per path.
+# This workflow sets a commit status instead, which can be made a required check.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: protected-paths-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  approvals:
+    name: Count approvals
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+      REQUIRED: 3
+      PROTECTED: ^(ARCHITECTURE\.md$|server/src/main/java/it/chalmers/commit/model/)
+    steps:
+      - name: Set status
+        run: |
+          set -euo pipefail
+
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+
+          if grep -Eq "$PROTECTED" <<<"$files"; then
+            # A reviewer's latest approval or change request is the one that counts.
+            approvals=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+              | jq -s 'add
+                  | map(select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED"))
+                  | group_by(.user.login)
+                  | map(max_by(.submitted_at))
+                  | map(select(.state == "APPROVED"))
+                  | length')
+            description="$approvals of $REQUIRED approvals for model or ARCHITECTURE.md changes"
+            if [ "$approvals" -ge "$REQUIRED" ]; then state=success; else state=failure; fi
+          else
+            state=success
+            description="No changes to the model or ARCHITECTURE.md"
+          fi
+
+          echo "$state: $description"
+          gh api --method POST "repos/$REPO/statuses/$SHA" --silent \
+            -f state="$state" \
+            -f context="Protected paths" \
+            -f description="$description"
