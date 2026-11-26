@@ -14,6 +14,7 @@ public final class Event {
     private String name;
     private String description;
     private LocalDateTime date;
+    private LocalDateTime endDate;
     private LocalDateTime signupDeadline;
     private int capacity;
     private EventStatus status = EventStatus.DRAFT;
@@ -24,27 +25,34 @@ public final class Event {
     private final Map<String, Signup> queue = new LinkedHashMap<>();
 
     public Event(String id, User poster, String name, String description,
-                 LocalDateTime date, int capacity, LocalDateTime signupDeadline) {
+                 LocalDateTime date, LocalDateTime endDate, int capacity, LocalDateTime signupDeadline) {
         this.id = requireText(id, "ID");
         this.poster = Objects.requireNonNull(poster, "Poster is required");
-        updateEvent(name, description, date, capacity, signupDeadline);
+        updateEvent(name, description, date, endDate, capacity, signupDeadline);
     }
 
+    // TODO: Use the State pattern here as in publishEvent(). Only PUBLISHED may return CANCELLED,
+    // and only before the event starts.
     public void cancelEvent() {
-        EventStatus currentStatus = getStatus();
-        if (currentStatus == EventStatus.CANCELLED || currentStatus == EventStatus.DONE) {
-            throw new IllegalStateException("A cancelled or completed event cannot be cancelled");
+        if (!isPublishedBeforeStart()) {
+            throw new IllegalStateException("Only published events can be cancelled before they start");
         }
         this.status = EventStatus.CANCELLED;
     }
 
     // A null deadline means signups remain open until the event starts.
     public void updateEvent(String name, String description, LocalDateTime date,
-                            int capacity, LocalDateTime signupDeadline) {
+                            LocalDateTime endDate, int capacity, LocalDateTime signupDeadline) {
+        // TODO: Delegate edit permission to EventStatus. DRAFT allows edits. PUBLISHED requires
+        // both the current and proposed start times to be in the future.
         requireEditable();
         requireText(name, "Name");
         Objects.requireNonNull(description, "Description is required");
         Objects.requireNonNull(date, "Event date is required");
+        Objects.requireNonNull(endDate, "Event end date is required");
+        if (!endDate.isAfter(date)) {
+            throw new IllegalArgumentException("Event end date must be after the start date");
+        }
 
         LocalDateTime deadline = signupDeadline == null ? date : signupDeadline;
         if (deadline.isAfter(date)) {
@@ -60,40 +68,22 @@ public final class Event {
         this.name = name;
         this.description = description;
         this.date = date;
+        this.endDate = endDate;
         this.capacity = capacity;
         this.signupDeadline = deadline;
         fillAvailableSpots();
     }
 
     public void publishEvent() {
-        if (this.status != EventStatus.DRAFT) {
-            throw new IllegalStateException("Only draft events can be published");
-        }
-        if (!date.isAfter(LocalDateTime.now())) {
-            throw new IllegalStateException("An event must start in the future to be published");
-        }
-        this.status = EventStatus.PUBLISHED;
-    }
-
-    // Refresh on access; no background task or thread is created per event.
-    private void startEvent() {
-        if (this.status == EventStatus.PUBLISHED && !LocalDateTime.now().isBefore(date)) {
-            this.status = EventStatus.ONGOING;
-        }
-    }
-
-    public void completeEvent() {
-        if (getStatus() != EventStatus.ONGOING) {
-            throw new IllegalStateException("Only ongoing events can be completed");
-        }
-        this.status = EventStatus.DONE;
+        this.status = this.status.publish(LocalDateTime.now(), date);
     }
 
     public int getAvailableSpots() {
         return capacity - attendees.size();
     }
 
-    // Full events still accept signups into the waiting queue.
+    // TODO: Delegate canSignup() to EventStatus. Only PUBLISHED accepts signups before the
+    // deadline, even when all confirmed spots are taken.
     public boolean canSignup() {
         return getStatus() == EventStatus.PUBLISHED
                 && LocalDateTime.now().isBefore(signupDeadline);
@@ -126,13 +116,11 @@ public final class Event {
         return signup;
     }
 
-    // Allow withdrawals after the signup deadline, but only before the event starts.
-    // TODO(team): If the merged Signup/Queue code handles cancellation, delegate to its API and
-    // remove duplicated attendee/queue removal and promotion logic below. Ensure cancellation
-    // still respects the event's status, removes the registration from the correct collection,
-    // and promotes the next queued signup exactly once when an attendee's spot becomes available.
+    // TODO: Delegate withdrawal permission to EventStatus. PUBLISHED allows withdrawals until
+    // the event starts, including after the signup deadline.
+    // TODO(team): Reuse the merged Signup/Queue API for removal and promotion when available.
     public void cancelSignup(User guest) {
-        if (getStatus() != EventStatus.PUBLISHED) {
+        if (!isPublishedBeforeStart()) {
             throw new IllegalStateException("Signups can only be cancelled before the event starts");
         }
 
@@ -162,10 +150,13 @@ public final class Event {
     }
 
     private void requireEditable() {
-        EventStatus currentStatus = getStatus();
-        if (currentStatus != EventStatus.DRAFT && currentStatus != EventStatus.PUBLISHED) {
-            throw new IllegalStateException("Only draft or published events can be updated");
+        if (status != EventStatus.DRAFT && !isPublishedBeforeStart()) {
+            throw new IllegalStateException("Only drafts and published events that have not started can be updated");
         }
+    }
+
+    private boolean isPublishedBeforeStart() {
+        return getStatus() == EventStatus.PUBLISHED && LocalDateTime.now().isBefore(date);
     }
 
     private static String requireUserId(User user) {
@@ -201,6 +192,10 @@ public final class Event {
         return date;
     }
 
+    public LocalDateTime getEndDate() {
+        return endDate;
+    }
+
     public LocalDateTime getSignupDeadline() {
         return signupDeadline;
     }
@@ -210,7 +205,7 @@ public final class Event {
     }
 
     public EventStatus getStatus() {
-        startEvent();
+        this.status = this.status.atTime(LocalDateTime.now(), endDate);
         return this.status;
     }
 

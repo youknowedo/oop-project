@@ -7,6 +7,7 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+/.local-preview/*.png
 
 # OS
 .DS_Store

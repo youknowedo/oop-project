@@ -162,6 +162,7 @@ classDiagram
         -String name
         -String description
         -DateTime date
+        -DateTime endDate
         -int capacity
         -DateTime signUpOpens
         -EventStatus status
@@ -246,7 +247,7 @@ stateDiagram-v2
     [*] --> DRAFT
     DRAFT --> PUBLISHED : post
     PUBLISHED --> CANCELLED : cancel
-    PUBLISHED --> FINISHED : date passed
+    PUBLISHED --> FINISHED : endDate reached
     CANCELLED --> [*]
     FINISHED --> [*]
 ```
