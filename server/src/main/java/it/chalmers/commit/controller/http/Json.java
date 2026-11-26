@@ -6,6 +6,7 @@ import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonSerializer;
 import com.google.gson.JsonSyntaxException;
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 /** Turns view objects into JSON and request bodies back into objects. */
 public final class Json {
@@ -20,6 +21,14 @@ public final class Json {
               Instant.class,
               (JsonDeserializer<Instant>)
                   (json, type, context) -> Instant.parse(json.getAsString()))
+          .registerTypeAdapter(
+              LocalDateTime.class,
+              (JsonSerializer<LocalDateTime>)
+                  (time, type, context) -> context.serialize(time.toString()))
+          .registerTypeAdapter(
+              LocalDateTime.class,
+              (JsonDeserializer<LocalDateTime>)
+                  (json, type, context) -> LocalDateTime.parse(json.getAsString()))
           .create();
 
   private Json() {}
